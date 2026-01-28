@@ -1,0 +1,15 @@
+[extend]
+# Use default gitleaks config
+
+[[rules]]
+id = "azure-keyvault-name"
+description = "Allow Azure Key Vault names (not secrets)"
+path = '''.*\.tf'''
+regex = '''kv[a-z0-9]+prod'''
+allowlist = { regexes = ['''kv[a-z0-9]+prod'''] }
+
+[[allowlist]]
+paths = [
+  '''\.env\.example''',
+  '''README\.md''',
+]

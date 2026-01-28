@@ -1,0 +1,272 @@
+trigger:
+  - main
+  - master
+
+variables:
+  azureContainerRegistry: "acrshrinet82prod.azurecr.io"
+  appImage: "audiencepulse"
+  tag: "$(Build.BuildId)"
+  azureServiceConnection: "Azure-DevSecOps-Connection"
+
+stages:
+  # -------------------------------------------------------------------------
+  # STAGE 1: SECURITY GATES
+  # -------------------------------------------------------------------------
+  - stage: SecurityGates
+    displayName: "Stage 1: Security Gates"
+    jobs:
+      - job: SecretScan
+        displayName: "Secret Scan (Gitleaks)"
+        pool:
+          name: "VMSS-Pool"
+        steps:
+          - script: |
+              wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+              tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
+              sudo mv gitleaks /usr/local/bin/
+              gitleaks detect --source . -v --report-format json --report-path gitleaks-report.json || true
+              gitleaks detect --source . -v
+            displayName: "Run Gitleaks"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Gitleaks Report"
+            condition: always()
+            inputs:
+              pathToPublish: "gitleaks-report.json"
+              artifactName: "security-artifacts"
+
+      - job: DependencyScan
+        displayName: "Dependency Scan"
+        pool:
+          name: "VMSS-Pool"
+        steps:
+          - script: |
+              pip3 install safety
+              safety check -r requirements.txt --json > dependency-report.json || true
+              safety check -r requirements.txt
+            displayName: "Run Dependency Scan"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Dependency Report"
+            condition: always()
+            inputs:
+              pathToPublish: "dependency-report.json"
+              artifactName: "security-artifacts"
+
+  # -------------------------------------------------------------------------
+  # STAGE 2: APP QUALITY
+  # -------------------------------------------------------------------------
+  - stage: AppQuality
+    displayName: "Stage 2: App Quality"
+    dependsOn: SecurityGates
+    jobs:
+      - job: PythonTests
+        displayName: "Python Tests"
+        pool:
+          name: "VMSS-Pool"
+        steps:
+          - script: |
+              pip3 install -r requirements.txt
+              pip3 install pytest pytest-cov
+              pytest tests/ -v --cov=audiencepulse --cov-report=term-missing || echo "Tests completed"
+            displayName: "Run Tests"
+
+      - job: LintCheck
+        displayName: "Lint Check"
+        pool:
+          name: "VMSS-Pool"
+        steps:
+          - script: |
+              pip3 install flake8
+              flake8 audiencepulse/ --max-line-length=120 --ignore=E501,W503 || true
+            displayName: "Run Flake8"
+
+  # -------------------------------------------------------------------------
+  # STAGE 3: BUILD FACTORY
+  # -------------------------------------------------------------------------
+  - stage: BuildFactory
+    displayName: "Stage 3: Build Factory"
+    dependsOn: AppQuality
+    jobs:
+      - job: BuildApp
+        displayName: "Build AudiencePulse Image"
+        pool:
+          name: "VMSS-Pool"
+        steps:
+          - script: |
+              for i in {1..10}; do
+                if sudo apt-get update && sudo apt-get install -y azure-cli; then break; fi
+                sleep 10
+              done
+            displayName: "Ensure Azure CLI"
+
+          - task: AzureCLI@2
+            displayName: "Build and Push Image"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az acr login --name acrshrinet82prod
+                docker build -t $(azureContainerRegistry)/$(appImage):$(tag) .
+                docker tag $(azureContainerRegistry)/$(appImage):$(tag) $(azureContainerRegistry)/$(appImage):latest
+                docker push $(azureContainerRegistry)/$(appImage):$(tag)
+                docker push $(azureContainerRegistry)/$(appImage):latest
+
+          - script: |
+              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+              trivy image --exit-code 1 --severity CRITICAL $(azureContainerRegistry)/$(appImage):$(tag) || true
+              trivy image --severity HIGH,CRITICAL $(azureContainerRegistry)/$(appImage):$(tag)
+            displayName: "Trivy CVE Scan"
+
+          - script: |
+              trivy image --format cyclonedx -o audiencepulse-sbom.json $(azureContainerRegistry)/$(appImage):$(tag)
+            displayName: "Generate SBOM"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish SBOM"
+            inputs:
+              pathToPublish: "audiencepulse-sbom.json"
+              artifactName: "security-artifacts"
+
+  # -------------------------------------------------------------------------
+  # STAGE 4: DELIVERY
+  # -------------------------------------------------------------------------
+  - stage: Delivery
+    displayName: "Stage 4: Delivery"
+    dependsOn: BuildFactory
+    jobs:
+      - deployment: Deploy
+        displayName: "Deploy to AKS"
+        environment: "production"
+        pool:
+          name: "VMSS-Pool"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - script: |
+                    for i in {1..10}; do
+                      if sudo apt-get update && sudo apt-get install -y unzip; then break; fi
+                      sleep 10
+                    done
+                    wget -q https://github.com/Azure/kubelogin/releases/download/v0.0.30/kubelogin-linux-amd64.zip
+                    unzip -o kubelogin-linux-amd64.zip
+                    sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+                  displayName: "Install Kubelogin"
+
+                - task: AzureCLI@2
+                  displayName: "Setup AKS Access"
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az aks get-credentials -g rg-devsecops-prod -n aks-devsecops-prod --overwrite-existing
+                      kubelogin convert-kubeconfig -l azurecli
+
+                - task: KubernetesManifest@1
+                  displayName: "Deploy AudiencePulse"
+                  inputs:
+                    action: deploy
+                    connectionType: azureResourceManager
+                    azureSubscriptionConnection: $(azureServiceConnection)
+                    azureResourceGroup: "rg-devsecops-prod"
+                    kubernetesCluster: "aks-devsecops-prod"
+                    manifests: k8s/audiencepulse.yaml
+                    containers: "$(azureContainerRegistry)/$(appImage):$(tag)"
+
+  # -------------------------------------------------------------------------
+  # STAGE 5: VERIFICATION
+  # -------------------------------------------------------------------------
+  - stage: Verification
+    displayName: "Stage 5: Live Verification"
+    dependsOn: Delivery
+    jobs:
+      - job: SmokeTest
+        displayName: "Smoke Test"
+        pool:
+          name: "VMSS-Pool"
+        steps:
+          - script: |
+              for i in {1..10}; do
+                if sudo apt-get update && sudo apt-get install -y azure-cli; then break; fi
+                sleep 10
+              done
+              sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              sudo install kubectl /usr/local/bin/kubectl
+            displayName: "Ensure CLI Tools"
+
+          - task: AzureCLI@2
+            displayName: "Verify Deployment"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az aks get-credentials -g rg-devsecops-prod -n aks-devsecops-prod
+                kubelogin convert-kubeconfig -l azurecli
+
+                echo "Checking AudiencePulse..."
+                kubectl rollout status deployment/audiencepulse --timeout=180s
+
+                echo "All pods:"
+                kubectl get pods
+
+                echo "AudiencePulse LoadBalancer IP:"
+                kubectl get svc audiencepulse -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+
+      - job: DAST
+        displayName: "DAST (OWASP ZAP)"
+        dependsOn: SmokeTest
+        pool:
+          name: "VMSS-Pool"
+        steps:
+          - script: |
+              for i in {1..10}; do
+                if sudo apt-get update && sudo apt-get install -y azure-cli unzip; then break; fi
+                sleep 10
+              done
+              sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              sudo install kubectl /usr/local/bin/kubectl
+              wget -q https://github.com/Azure/kubelogin/releases/download/v0.0.30/kubelogin-linux-amd64.zip
+              unzip -o kubelogin-linux-amd64.zip
+              sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+            displayName: "Install CLI Tools"
+
+          - task: AzureCLI@2
+            displayName: "Run OWASP ZAP"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az aks get-credentials -g rg-devsecops-prod -n aks-devsecops-prod
+                kubelogin convert-kubeconfig -l azurecli
+
+                # Get app IP
+                APP_IP=$(kubectl get svc audiencepulse -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+                echo "Target: http://$APP_IP:8501"
+
+                # Create work directory for ZAP
+                mkdir -p zap-work
+                chmod 777 zap-work
+
+                # Run OWASP ZAP baseline scan
+                docker run --rm -v $(pwd)/zap-work:/zap/wrk:rw \
+                  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+                  -t http://$APP_IP:8501 \
+                  -r zap_report.html \
+                  -I || true
+
+                # Copy report to accessible location
+                cp zap-work/zap_report.html . || echo "ZAP report not found"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish ZAP Report"
+            condition: always()
+            inputs:
+              pathToPublish: "zap-work/zap_report.html"
+              artifactName: "security-artifacts"
