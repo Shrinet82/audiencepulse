@@ -9,3 +9,4 @@ sentence-transformers>=2.2.0
 hdbscan>=0.8.33
 reportlab>=4.0.0
 requests>=2.31.0
+youtube-comment-downloader>=0.1.68
