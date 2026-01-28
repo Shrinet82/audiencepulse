@@ -168,6 +168,16 @@ stages:
                       kubelogin convert-kubeconfig -l azurecli
 
                 - task: KubernetesManifest@1
+                  displayName: "Deploy SecretProviderClass"
+                  inputs:
+                    action: deploy
+                    connectionType: azureResourceManager
+                    azureSubscriptionConnection: $(azureServiceConnection)
+                    azureResourceGroup: "rg-devsecops-prod"
+                    kubernetesCluster: "aks-devsecops-prod"
+                    manifests: k8s/secretproviderclass.yaml
+
+                - task: KubernetesManifest@1
                   displayName: "Deploy AudiencePulse"
                   inputs:
                     action: deploy

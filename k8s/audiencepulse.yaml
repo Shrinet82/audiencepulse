@@ -4,7 +4,7 @@ metadata:
   name: audiencepulse-secrets
 type: Opaque
 stringData:
-  GROQ_API_KEY: "YOUR_GROQ_API_KEY_HERE" # Replace with actual key or use Azure Key Vault
+  GROQ_API_KEY: "placeholder" # Will be overwritten by CSI driver from Key Vault
 
 ---
 apiVersion: apps/v1
@@ -61,6 +61,10 @@ spec:
               drop:
                 - ALL
             readOnlyRootFilesystem: false
+          volumeMounts:
+            - name: secrets-store
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /_stcore/health
@@ -75,6 +79,13 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 5
             timeoutSeconds: 3
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "audiencepulse-secrets-provider"
 
 ---
 apiVersion: v1
