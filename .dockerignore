@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.eggs
+*.egg-info
+.venv
+venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Temp files
+*.log
+*.tmp
+temp_*.jsonl
+*.jsonl
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+*.pdf
+creator_audit_report.json
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs
+README.md
+docs/
+*.md
