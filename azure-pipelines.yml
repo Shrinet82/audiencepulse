@@ -224,8 +224,11 @@ stages:
                 if sudo apt-get update && sudo apt-get install -y azure-cli; then break; fi
                 sleep 10
               done
-              sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-              sudo install kubectl /usr/local/bin/kubectl
+              # Install kubectl
+              KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+              curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+              sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+              kubectl version --client || true
             displayName: "Ensure CLI Tools"
 
           - task: AzureCLI@2
@@ -258,8 +261,10 @@ stages:
                 if sudo apt-get update && sudo apt-get install -y azure-cli unzip; then break; fi
                 sleep 10
               done
-              sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-              sudo install kubectl /usr/local/bin/kubectl
+              # Install kubectl
+              KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+              curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+              sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
               wget -q https://github.com/Azure/kubelogin/releases/download/v0.0.30/kubelogin-linux-amd64.zip
               unzip -o kubelogin-linux-amd64.zip
               sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
