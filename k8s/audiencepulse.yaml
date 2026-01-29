@@ -49,6 +49,15 @@ spec:
               value: "true"
             - name: STREAMLIT_SERVER_ADDRESS
               value: "0.0.0.0"
+            # Fix for non-root user without /etc/passwd entry
+            - name: HOME
+              value: "/tmp"
+            - name: HF_HOME
+              value: "/tmp/.cache/huggingface"
+            - name: TRANSFORMERS_CACHE
+              value: "/tmp/.cache/transformers"
+            - name: SENTENCE_TRANSFORMERS_HOME
+              value: "/tmp/.cache/sentence_transformers"
           resources:
             requests:
               memory: "512Mi"
