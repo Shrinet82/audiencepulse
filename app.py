@@ -200,10 +200,17 @@ def fetch_all_data(url: str) -> dict:
         pass
     
     comments = []
-    subprocess.run(
+    result = subprocess.run(
         ["python3", "scraper.py", url, "-o", "temp_comments.jsonl"],
         capture_output=True, text=True, cwd=os.getcwd()
     )
+
+    if result.returncode != 0:
+        print(f"Scraper error: {result.stderr}")
+        try:
+            st.error(f"Failed to fetch comments: {result.stderr}")
+        except:
+            pass # In case called outside streamlit context context
     
     if os.path.exists('temp_comments.jsonl'):
         with open('temp_comments.jsonl', 'r', encoding='utf-8') as f:
