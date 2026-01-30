@@ -17,6 +17,7 @@ from .audience_dna import analyze_audience_dna, get_audience_fit_score
 from .brand_affinity import analyze_brand_affinity
 from .trust_score import get_community_health
 from .semantic_cluster import semantic_cluster_analysis, get_top_clusters
+from .context_mapper import map_comments_to_context
 
 
 # ============================================
@@ -192,6 +193,20 @@ def run_creator_audit(
         'timing': {}
     }
     
+    # 0. CONTEXT MAPPING (New Feature)
+    transcript = video_metadata.get('transcript') if video_metadata else None
+    
+    if transcript:
+        print(f"\n🧠 [0/4] CONTEXT MAPPING")
+        # Enhance comments with context
+        context_result = map_comments_to_context(comments, transcript)
+        # Use context-aware comments for subsequent analysis
+        comments = context_result.get('mapped_comments', comments)
+        print(f"   {context_result['summary']}")
+        report['context_stats'] = context_result['stats']
+    else:
+        print("\nℹ️ [0/4] CONTEXT MAPPING: No transcript available (skipping)")
+
     # 1. AUDIENCE DNA
     print("\n💰 [1/4] AUDIENCE DNA")
     report['audience_dna'] = analyze_audience_dna(comments)

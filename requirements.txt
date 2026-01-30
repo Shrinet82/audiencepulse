@@ -9,4 +9,5 @@ sentence-transformers>=2.2.0
 reportlab>=4.0.0
 requests>=2.31.0
 youtube-comment-downloader>=0.1.68
+youtube-transcript-api>=0.6.0
 tqdm>=4.65.0

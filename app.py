@@ -194,9 +194,14 @@ def fetch_all_data(url: str) -> dict:
     """Fetch comments and metadata."""
     metadata = {}
     try:
-        from audiencepulse.video_analyzer import get_video_metadata
+        from audiencepulse.video_analyzer import get_video_metadata, get_transcript
         metadata = get_video_metadata(url)
-    except:
+        # Fetch transcript for context mapping
+        transcript_data = get_transcript(url)
+        if transcript_data and 'segments' in transcript_data:
+            metadata['transcript'] = transcript_data['segments']
+    except Exception as e:
+        print(f"Metadata fetch error: {e}")
         pass
     
     comments = []

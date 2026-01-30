@@ -65,6 +65,23 @@ def analyze_trust(comments: List[Dict]) -> Dict[str, Any]:
     
     for comment in comments:
         text = comment.get('text', '').lower() if isinstance(comment, dict) else str(comment).lower()
+        classification = comment.get('_classification', {}) if isinstance(comment, dict) else {}
+        
+        # Context Aware Override
+        if classification.get('contextualized_sentiment') == 'agreement_with_creator':
+            # User agrees with creator (even if negative words used) -> Trust Signal
+            loyalty_count += 1
+            if len(loyalty_examples) < 3:
+                loyalty_examples.append(f"[Context] {text[:100]}")
+            continue # Skip keyword check
+            
+        if classification.get('contextualized_sentiment') == 'disagreement_with_creator':
+             # User disagrees -> Skepticism Signal
+             skepticism_count += 1
+             if len(skepticism_examples) < 3:
+                 skepticism_examples.append(f"[Context] {text[:100]}")
+             continue
+
         
         # Check skepticism
         for keyword in SKEPTICISM_KEYWORDS:
