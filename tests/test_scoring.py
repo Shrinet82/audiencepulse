@@ -50,4 +50,4 @@ def test_brand_veto():
     # The new logic caps final score at 35.
     
     assert result['score'] <= 35
-    assert "Hostile" in result['failure_reason']
+    assert "hostile" in result['failure_reason']
