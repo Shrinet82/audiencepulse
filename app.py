@@ -325,18 +325,28 @@ else:
     st.markdown("### 👤 Creator Profile Builder")
     st.markdown("*Paste 3-5 video URLs from the same creator for comprehensive audience analysis*")
     
-    col_name, col_product = st.columns([2, 1])
+    col1, col2 = st.columns(2)
     
-    with col_name:
+    with col1:
         creator_name = st.text_input("Creator Name", placeholder="e.g., MKBHD", key="creator_name_input")
+        product_name = st.text_input("Product Name", placeholder="e.g., iPhone 16 Pro", key="profile_product_name")
     
-    with col_product:
+    with col2:
         product_type = st.selectbox(
-            "Product Type",
+            "Product Tier",
             ["premium", "mid_tier", "budget"],
             format_func=lambda x: {"premium": "💎 Premium", "mid_tier": "📊 Mid-Tier", "budget": "💰 Budget"}[x],
-            key="profile_product"
+            key="profile_product_tier"
         )
+        col2a, col2b = st.columns(2)
+        with col2a:
+             product_price = st.number_input("Price (₹)", min_value=0, value=50000, step=1000, key="profile_product_price")
+        with col2b:
+             product_category = st.selectbox(
+                "Category",
+                ["Tech", "Fashion", "Beauty", "Gaming", "Lifestyle", "Finance", "Education", "Other"],
+                key="profile_product_cat"
+             )
     
     video_urls = st.text_area(
         "Video URLs (one per line)",
@@ -431,10 +441,18 @@ if 'profile_mode' in dir() and profile_mode:
                     def update_progress(msg):
                         progress.progress(50, text=msg)
                     
+                    # Construct context
+                    profile_context = {
+                        'name': product_name,
+                        'price': product_price,
+                        'category': product_category,
+                        'tier': product_type
+                    }
+                    
                     profile = build_creator_profile(
                         video_urls=urls,
                         creator_name=creator_name,
-                        product_context={'tier': product_type}, # Minimal context from profile UI
+                        product_context=profile_context,
                         product_category=product_type,
                         embedding_model=embedding_model,
                         progress_callback=update_progress
