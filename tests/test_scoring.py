@@ -51,3 +51,31 @@ def test_brand_veto():
     
     assert result['score'] <= 35
     assert "hostile" in result['failure_reason']
+
+def test_persona_matching():
+    """Test that description matching personas boosts the score."""
+    dna = {
+        'spending_power': {'premium_score': 50, 'budget_score': 50},
+        'tech_literacy': {'expert_score': 50, 'casual_score': 50},
+        'personas': {'personas': [{'name': 'Gamer', 'percentage': 40}]}
+    }
+    brand = {'brand_orbit': [], 'dominant_tier': 'mid'}
+    health = {'trust': {'score_numeric': 50}}
+    
+    # CASE 1: No Description
+    context_no_desc = {'price': 25000, 'name': 'Mid Headphones', 'category': 'Tech', 'tier': 'mid'}
+    res_no_desc = calculate_creator_fit(dna, brand, health, product_context=context_no_desc)
+    base_category_score = res_no_desc['breakdown']['category_fit']
+    
+    # CASE 2: Description matches "Gamer"
+    context_gamer = {'price': 25000, 'name': 'Mid Headphones', 'category': 'Tech', 'tier': 'mid', 'description': 'Perfect for any serious gamer'}
+    res_gamer = calculate_creator_fit(dna, brand, health, product_context=context_gamer)
+    boosted_category_score = res_gamer['breakdown']['category_fit']
+    
+    # Boost Logic: 40% / 2 = 20 points
+    # Start (Tech) = 50 (expert_score)
+    # Boosted = 50 + 20 = 70
+    
+    assert boosted_category_score > base_category_score
+    assert boosted_category_score == base_category_score + 20
+    assert 'persona_boost' in res_gamer['breakdown']

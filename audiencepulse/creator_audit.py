@@ -115,6 +115,32 @@ def calculate_creator_fit(
         cat_fit = 60
         
     score_components['category_fit'] = cat_fit
+    
+    # 3.5 DESCRIPTION PERSONA MATCHING (Boost)
+    # Check if description keywords match any detected personas
+    description = product_context.get('description', '').lower()
+    personas = dna.get('personas', {}).get('personas', [])
+    
+    persona_boost = 0
+    matched_personas = []
+    
+    if description and personas:
+        for persona in personas:
+            p_name = persona.get('name', '').lower()
+            # Simple keyword matching: if persona name ('gamer') is in description
+            if p_name in description:
+                # Boost based on how dominant this persona is
+                # Example: If 'Gamer' is 40% of audience, add 20 points
+                boost_val = min(20, int(persona.get('percentage', 0) / 2))
+                persona_boost += boost_val
+                matched_personas.append(p_name)
+    
+    if persona_boost > 0:
+        # Boost Category Fit but cap at 100
+        score_components['category_fit'] = min(100, score_components['category_fit'] + persona_boost)
+        # We'll note this in the breakdown for transparency
+        score_components['persona_boost'] = persona_boost
+        score_components['matched_personas'] = matched_personas
 
     # 4. TRUST & SAFETY (20%)
     trust = max(0, min(100, community_health.get('trust', {}).get('score_numeric', 0) + 50))

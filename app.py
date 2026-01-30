@@ -294,7 +294,7 @@ if analysis_mode == "🎬 Single Video":
         product_description = st.text_area(
             "Product Description / Target Audience",
             placeholder="e.g., Premium noise-cancelling headphones for audiophiles and frequent travelers",
-            height=60,
+            height=70,
             key="prod_desc"
         )
     
@@ -332,12 +332,6 @@ else:
         product_name = st.text_input("Product Name", placeholder="e.g., iPhone 16 Pro", key="profile_product_name")
     
     with col2:
-        product_type = st.selectbox(
-            "Product Tier",
-            ["premium", "mid_tier", "budget"],
-            format_func=lambda x: {"premium": "💎 Premium", "mid_tier": "📊 Mid-Tier", "budget": "💰 Budget"}[x],
-            key="profile_product_tier"
-        )
         col2a, col2b = st.columns(2)
         with col2a:
              product_price = st.number_input("Price (₹)", min_value=0, value=50000, step=1000, key="profile_product_price")
@@ -347,7 +341,22 @@ else:
                 ["Tech", "Fashion", "Beauty", "Gaming", "Lifestyle", "Finance", "Education", "Other"],
                 key="profile_product_cat"
              )
+        
+        # Determine product type from price (Auto-Tier)
+        if product_price >= 50000:
+            product_type = "premium"
+        elif product_price >= 15000:
+            product_type = "mid_tier"
+        else:
+            product_type = "budget"
     
+    product_description = st.text_area(
+        "Product Description / Target Audience",
+        placeholder="e.g., Premium noise-cancelling headphones for audiophiles...",
+        height=70,
+        key="profile_prod_desc"
+    )
+
     video_urls = st.text_area(
         "Video URLs (one per line)",
         placeholder="https://youtube.com/watch?v=abc123\nhttps://youtube.com/watch?v=def456\nhttps://youtube.com/watch?v=ghi789",
@@ -446,7 +455,8 @@ if 'profile_mode' in dir() and profile_mode:
                         'name': product_name,
                         'price': product_price,
                         'category': product_category,
-                        'tier': product_type
+                        'tier': product_type,
+                        'description': product_description
                     }
                     
                     profile = build_creator_profile(
