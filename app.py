@@ -385,6 +385,7 @@ if audit_clicked and url:
                 results = run_creator_audit(
                     comments=raw_data['comments'],
                     video_metadata=raw_data['metadata'],
+                    product_context=product_context,
                     product_category=product_type,
                     embedding_model=embedding_model
                 )
@@ -433,6 +434,7 @@ if 'profile_mode' in dir() and profile_mode:
                     profile = build_creator_profile(
                         video_urls=urls,
                         creator_name=creator_name,
+                        product_context={'tier': product_type}, # Minimal context from profile UI
                         product_category=product_type,
                         embedding_model=embedding_model,
                         progress_callback=update_progress

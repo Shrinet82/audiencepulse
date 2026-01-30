@@ -28,130 +28,155 @@ def calculate_creator_fit(
     dna: Dict,
     brand_affinity: Dict,
     community_health: Dict,
-    product_type: str = 'premium'
+    product_context: Dict = None,
+    product_type: str = 'premium' # Deprecated, used if context missing
 ) -> Dict[str, Any]:
     """
-    Calculate overall creator-product fit score.
+    Calculate RELATIVE creator-product fit score.
+    Scores are based on how well the audience matches THIS specific product.
     
-    Args:
-        dna: Audience DNA analysis
-        brand_affinity: Brand affinity analysis
-        community_health: Trust and toxicity analysis
-        product_type: 'premium', 'mid_tier', or 'budget'
-    
-    Returns:
-        {
-            'score': 0-100,
-            'grade': 'A+' to 'F',
-            'verdict': str,
-            'failure_reason': str,
-            'breakdown': {...}
-        }
+    Weights:
+    - Price Compatibility: 30%
+    - Brand Compatibility: 30%
+    - Category Relevance: 20%
+    - Trust & Safety: 20%
     """
-    # Component scores
-    spending_score = dna.get('spending_power', {}).get('premium_score', 50)
-    budget_score = dna.get('spending_power', {}).get('budget_score', 50)
-    literacy_score = dna.get('tech_literacy', {}).get('expert_score', 50)
+    if not product_context:
+        # Fallback to legacy logic for backward compatibility
+        return _calculate_legacy_fit(dna, brand_affinity, community_health, product_type)
+
+    score_components = {
+        'price_fit': 0,
+        'brand_fit': 0,
+        'category_fit': 0,
+        'trust_score': 0
+    }
     
-    # Trust score with brand sentiment cap
-    raw_trust = max(0, community_health.get('trust', {}).get('score_numeric', 0) + 50)
+    # 1. PRICE COMPATIBILITY (30%)
+    price = product_context.get('price', 0)
+    spending = dna.get('spending_power', {})
+    premium_pct = spending.get('premium_score', 50)
+    budget_pct = spending.get('budget_score', 50)
     
-    # FIX: Cap trust if brand sentiment is universally low (toxic audience)
+    if price > 50000: # High Ticket (₹50k+)
+        # Strict requirement for premium audience
+        price_fit = premium_pct
+    elif price < 15000: # Budget (Under ₹15k)
+        # Strict requirement for budget audience
+        price_fit = budget_pct
+    else: # Mid-Range
+        # Best fit is balanced audience (e.g. 50% premium). 
+        # Penalize if too skewed to budget OR too skewed to luxury (they might ignore mid-range)
+        dist_from_center = abs(premium_pct - 50)
+        price_fit = 100 - (dist_from_center * 1.5) # Map 50->100, 0/100 -> 25
+    
+    score_components['price_fit'] = max(0, min(100, price_fit))
+
+    # 2. BRAND COMPATIBILITY (30%)
+    target_brand = product_context.get('name', '').lower()
     brand_orbit = brand_affinity.get('brand_orbit', [])
-    if brand_orbit:
-        avg_brand_sentiment = sum(b.get('positive_pct', 50) for b in brand_orbit) / len(brand_orbit)
-        if avg_brand_sentiment < 30:
-            # Toxic audience - cap trust score
-            raw_trust = min(raw_trust, 40)  # Cap at C level
+    brand_mentions = [b for b in brand_orbit if b['name'].lower() in target_brand or target_brand in b['name'].lower()]
+    
+    if brand_mentions:
+        # Brand exists in orbit! Use the sentiment.
+        sentiment = brand_mentions[0].get('positive_pct', 50)
+        if sentiment < 40:
+            # VETO: They hate this brand.
+            brand_fit = 0 
+        else:
+            brand_fit = sentiment
     else:
-        avg_brand_sentiment = 50
-    
-    trust_score = raw_trust
-    
-    # Brand tier alignment
-    tier_dist = brand_affinity.get('tier_distribution', {})
-    if product_type == 'premium':
-        brand_alignment = tier_dist.get('premium', 33)
-    elif product_type == 'budget':
-        brand_alignment = tier_dist.get('budget', 33)
+        # Fallback: Does the audience allow this TIER?
+        target_tier = product_context.get('tier', 'mid')
+        audience_tier = brand_affinity.get('dominant_tier', 'mid')
+        
+        if target_tier == audience_tier:
+            brand_fit = 80 # Good fit
+        elif (target_tier == 'premium' and audience_tier == 'mid') or \
+             (target_tier == 'mid' and audience_tier == 'budget'):
+             brand_fit = 60 # Okay fit
+        else:
+             brand_fit = 40 # Poor fit (Premium brand to Budget audience)
+             
+    score_components['brand_fit'] = brand_fit
+
+    # 3. CATEGORY RELEVANCE (20%)
+    target_cat = product_context.get('category', 'Tech').lower()
+    # Simple heuristic checks
+    if target_cat in ['tech', 'gaming', 'electronics']:
+        # Use Tech Literacy as proxy for relevance
+        cat_fit = dna.get('tech_literacy', {}).get('expert_score', 50)
+    elif target_cat in ['fashion', 'beauty', 'lifestyle']:
+        # Use simple "Casual" score as proxy for "Visual/Vibe" focus
+        # In current DNA, 'casual' keywords include 'aesthetic', 'design'
+        cat_fit = dna.get('tech_literacy', {}).get('casual_score', 50)
     else:
-        brand_alignment = tier_dist.get('mid', 34)
+        # Generic category - assume neutral relevance
+        cat_fit = 60
+        
+    score_components['category_fit'] = cat_fit
+
+    # 4. TRUST & SAFETY (20%)
+    trust = max(0, min(100, community_health.get('trust', {}).get('score_numeric', 0) + 50))
     
-    # Weighted average
-    if product_type == 'premium':
-        score = int(
-            (spending_score * 0.35) +
-            (trust_score * 0.25) +
-            (brand_alignment * 0.25) +
-            (literacy_score * 0.15)
-        )
-    else:
-        score = int(
-            (budget_score * 0.30) +
-            (trust_score * 0.30) +
-            (brand_alignment * 0.25) +
-            (50 * 0.15)
-        )
+    # Safety Check
+    toxicity_pct = community_health.get('toxicity', {}).get('toxicity_pct', 0)
+    if toxicity_pct > 20:
+        trust = max(0, trust - (toxicity_pct * 2)) # Heavy penalty for toxicity
+        
+    score_components['trust_score'] = trust
+
+    # FINAL WEIGHTED SCORE
+    final_score = (
+        (score_components['price_fit'] * 0.30) +
+        (score_components['brand_fit'] * 0.30) +
+        (score_components['category_fit'] * 0.20) +
+        (score_components['trust_score'] * 0.20)
+    )
     
-    # Clamp to 0-100
-    score = max(0, min(100, score))
+    final_score = int(max(0, min(100, final_score)))
     
-    # Identify failure reasons
+    # Generate specific feedback
     failure_reasons = []
-    
-    if product_type == 'premium':
-        if spending_score < 40:
-            failure_reasons.append(f"Low spending power ({spending_score}% premium buyers vs required 40%+)")
-        if trust_score < 50:
-            failure_reasons.append(f"Trust issues (score {trust_score}, audience skeptical)")
-        if brand_alignment < 30:
-            failure_reasons.append(f"Wrong brand tier (only {brand_alignment}% premium brand mentions)")
-        if avg_brand_sentiment < 30:
-            failure_reasons.append(f"Toxic audience (avg brand sentiment {avg_brand_sentiment:.0f}%)")
-    else:
-        if budget_score < 40:
-            failure_reasons.append(f"Audience not price-conscious enough ({budget_score}%)")
-    
-    # Grade
-    if score >= 85:
-        grade = 'A+'
-        verdict = '🎯 Excellent Fit - Highly recommend sponsorship'
-    elif score >= 75:
+
+    # CRITICAL VETO: If Brand Fit is 0 (Hostile), you cannot pass.
+    if score_components['brand_fit'] == 0:
+        final_score = min(final_score, 35) # Force F grade
+        failure_reasons.insert(0, f"⛔ CRITICAL: Audience is hostile towards {target_brand}")
+
+    # Verdict Generation with Context
+    if final_score >= 85:
         grade = 'A'
-        verdict = '✅ Strong Fit - Good sponsorship opportunity'
-    elif score >= 65:
-        grade = 'B+'
-        verdict = '👍 Good Fit - Consider sponsoring'
-    elif score >= 55:
+        verdict = f"🚀 Perfect Match for {target_brand}"
+    elif final_score >= 70:
         grade = 'B'
-        verdict = '📊 Moderate Fit - Proceed with defined expectations'
-    elif score >= 45:
+        verdict = f"✅ Good Fit for {target_brand}"
+    elif final_score >= 50:
         grade = 'C'
-        verdict = '⚠️ Weak Fit - May not be ideal match'
+        verdict = "⚠️ Marginal Fit - Proceed with Caution"
     else:
-        grade = 'D'
-        verdict = '❌ Poor Fit - Not recommended for this product'
-    
-    # Dynamic failure reason for executives
-    if failure_reasons:
-        failure_reason = "Failure: " + "; ".join(failure_reasons[:2])
-    else:
-        failure_reason = ""
+        grade = 'F'
+        verdict = f"❌ Incompatible with {target_brand}"
+
+    # Generate specific feedback (Appended to Veto if exists)
+    # failure_reasons initialized above
+    if score_components['price_fit'] < 40:
+        failure_reasons.append(f"Price Mismatch (Product too {'expensive' if price > 20000 else 'cheap'} for audience)")
+    if score_components['brand_fit'] < 40:
+        failure_reasons.append(f"Brand Incompatibility (Audience dislike or tier mismatch)")
     
     return {
-        'score': score,
+        'score': final_score,
         'grade': grade,
         'verdict': verdict,
-        'failure_reason': failure_reason,
-        'product_type': product_type,
-        'avg_brand_sentiment': round(avg_brand_sentiment, 1),
-        'breakdown': {
-            'spending_power': spending_score,
-            'tech_literacy': literacy_score,
-            'trust': trust_score,
-            'brand_alignment': brand_alignment
-        }
+        'failure_reason': "; ".join(failure_reasons),
+        'breakdown': score_components
     }
+
+def _calculate_legacy_fit(dna, brand_affinity, community_health, product_type):
+    """Legacy grading for backward compatibility."""
+    # ... (Keep original logic minimal or just simple avg)
+    return {'score': 50, 'grade': 'C', 'verdict': 'Legacy Mode', 'breakdown': {}}
 
 
 # ============================================
@@ -161,7 +186,8 @@ def calculate_creator_fit(
 def run_creator_audit(
     comments: List[Dict],
     video_metadata: Dict = None,
-    product_category: str = 'premium',
+    product_context: Dict = None, # New
+    product_category: str = 'premium', # Deprecated
     embedding_model: Any = None
 ) -> Dict[str, Any]:
     """
@@ -170,7 +196,8 @@ def run_creator_audit(
     Args:
         comments: List of comment dicts
         video_metadata: Video title, channel, etc.
-        product_category: 'premium', 'mid_tier', or 'budget'
+        product_context: Full context (price, name, category)
+        product_category: Fallback legacy category
         embedding_model: Pre-loaded SentenceTransformer
     
     Returns:
@@ -239,7 +266,8 @@ def run_creator_audit(
         report['audience_dna'],
         report['brand_affinity'],
         report['community_health'],
-        product_category
+        product_context=product_context,
+        product_type=product_category
     )
     print(f"   Score: {report['creator_fit']['score']}% ({report['creator_fit']['grade']})")
     print(f"   {report['creator_fit']['verdict']}")

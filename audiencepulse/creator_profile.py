@@ -48,7 +48,8 @@ def get_video_info(url: str) -> Dict:
 def build_creator_profile(
     video_urls: List[str],
     creator_name: str = "Unknown Creator",
-    product_category: str = "premium",
+    product_context: Dict = None, # New
+    product_category: str = "premium", # Deprecated
     embedding_model: Any = None,
     progress_callback: callable = None
 ) -> Dict[str, Any]:
@@ -58,6 +59,7 @@ def build_creator_profile(
     Args:
         video_urls: List of YouTube video URLs (3-5 recommended)
         creator_name: Name of the creator
+        product_context: Full context (price, name, category)
         product_category: Target product category
         embedding_model: Pre-loaded SentenceTransformer
         progress_callback: Optional callback for progress updates
@@ -113,6 +115,7 @@ def build_creator_profile(
         profile['merged_audit'] = run_creator_audit(
             comments=all_comments,
             video_metadata={'channel': creator_name},
+            product_context=product_context,
             product_category=product_category,
             embedding_model=embedding_model
         )
