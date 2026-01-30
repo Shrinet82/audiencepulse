@@ -29,7 +29,8 @@ def calculate_creator_fit(
     brand_affinity: Dict,
     community_health: Dict,
     product_context: Dict = None,
-    product_type: str = 'premium' # Deprecated, used if context missing
+    product_type: str = 'premium', # Deprecated, used if context missing
+    embedding_model: Any = None
 ) -> Dict[str, Any]:
     """
     Calculate RELATIVE creator-product fit score.
@@ -86,17 +87,10 @@ def calculate_creator_fit(
         else:
             brand_fit = sentiment
     else:
-        # Fallback: Does the audience allow this TIER?
-        target_tier = product_context.get('tier', 'mid')
-        audience_tier = brand_affinity.get('dominant_tier', 'mid')
-        
-        if target_tier == audience_tier:
-            brand_fit = 80 # Good fit
-        elif (target_tier == 'premium' and audience_tier == 'mid') or \
-             (target_tier == 'mid' and audience_tier == 'budget'):
-             brand_fit = 60 # Okay fit
-        else:
-             brand_fit = 40 # Poor fit (Premium brand to Budget audience)
+        # Fallback: Brand not found. Default to Neutral (50).
+        # We cannot safely infer brand affinity from tier alone (False Positive Risk).
+        # User Feedback: "Uncertainty should not result in a high score."
+        brand_fit = 50
              
     score_components['brand_fit'] = brand_fit
 
@@ -117,23 +111,48 @@ def calculate_creator_fit(
     score_components['category_fit'] = cat_fit
     
     # 3.5 DESCRIPTION PERSONA MATCHING (Boost)
-    # Check if description keywords match any detected personas
+    # Check if description semantically matches any detected personas (Vector Search)
     description = product_context.get('description', '').lower()
     personas = dna.get('personas', {}).get('personas', [])
     
     persona_boost = 0
     matched_personas = []
     
-    if description and personas:
+    if description and personas and embedding_model:
+        try:
+            # Encode description
+            desc_embedding = embedding_model.encode(description, convert_to_tensor=True)
+            
+            from sentence_transformers import util
+            
+            for persona in personas:
+                # Encode persona description + name for richer context
+                p_text = f"{persona.get('name', '')}: {persona.get('description', '')}"
+                p_embedding = embedding_model.encode(p_text, convert_to_tensor=True)
+                
+                # Calculate Cosine Similarity
+                similarity = util.cos_sim(desc_embedding, p_embedding).item()
+                
+                # Semantic Match Threshold (0.4 is a strong signal for short text)
+                if similarity > 0.4:  
+                    # Boost based on how dominant this persona is
+                    # Example: If 'Gamer' is 40% of audience, add 20 points
+                    boost_val = min(20, int(persona.get('percentage', 0) / 2))
+                    persona_boost += boost_val
+                    matched_personas.append(f"{persona.get('name')} ({similarity:.2f})")
+                    
+        except Exception as e:
+            print(f"Embedding error: {e}")
+            pass
+            
+    elif description and personas and not embedding_model:
+        # Fallback to string match if model missing (for tests/legacy)
         for persona in personas:
-            p_name = persona.get('name', '').lower()
-            # Simple keyword matching: if persona name ('gamer') is in description
-            if p_name in description:
-                # Boost based on how dominant this persona is
-                # Example: If 'Gamer' is 40% of audience, add 20 points
-                boost_val = min(20, int(persona.get('percentage', 0) / 2))
-                persona_boost += boost_val
-                matched_personas.append(p_name)
+             p_name = persona.get('name', '').lower()
+             if p_name in description:
+                 boost_val = min(20, int(persona.get('percentage', 0) / 2))
+                 persona_boost += boost_val
+                 matched_personas.append(p_name)
     
     if persona_boost > 0:
         # Boost Category Fit but cap at 100
@@ -293,7 +312,8 @@ def run_creator_audit(
         report['brand_affinity'],
         report['community_health'],
         product_context=product_context,
-        product_type=product_category
+        product_type=product_category,
+        embedding_model=embedding_model
     )
     print(f"   Score: {report['creator_fit']['score']}% ({report['creator_fit']['grade']})")
     print(f"   {report['creator_fit']['verdict']}")

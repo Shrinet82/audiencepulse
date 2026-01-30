@@ -332,6 +332,13 @@ else:
         product_name = st.text_input("Product Name", placeholder="e.g., iPhone 16 Pro", key="profile_product_name")
     
     with col2:
+        product_type = st.selectbox(
+            "Product Tier",
+            ["premium", "mid_tier", "budget"],
+            format_func=lambda x: {"premium": "💎 Premium", "mid_tier": "📊 Mid-Tier", "budget": "💰 Budget"}[x],
+            key="profile_product_tier"
+        )
+        
         col2a, col2b = st.columns(2)
         with col2a:
              product_price = st.number_input("Price (₹)", min_value=0, value=50000, step=1000, key="profile_product_price")
@@ -341,14 +348,6 @@ else:
                 ["Tech", "Fashion", "Beauty", "Gaming", "Lifestyle", "Finance", "Education", "Other"],
                 key="profile_product_cat"
              )
-        
-        # Determine product type from price (Auto-Tier)
-        if product_price >= 50000:
-            product_type = "premium"
-        elif product_price >= 15000:
-            product_type = "mid_tier"
-        else:
-            product_type = "budget"
     
     product_description = st.text_area(
         "Product Description / Target Audience",
