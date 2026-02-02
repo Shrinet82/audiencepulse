@@ -6,6 +6,7 @@ pandas>=2.0.0
 numpy>=1.24.0
 scikit-learn>=1.3.0
 # sentence-transformers removed (handled in Dockerfile for CPU optimization)
+fpdf>=1.7.2
 reportlab>=4.0.0
 requests>=2.31.0
 youtube-transcript-api>=0.6.0
