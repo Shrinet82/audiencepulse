@@ -860,7 +860,7 @@ if st.session_state.audit_results:
         if st.button("📄 Generate PDF Brief", use_container_width=True):
              # Logic to generate PDF (reusing imported reports.py)
              try:
-                from reports import generate_pdf_report
+                from audiencepulse.pdf_report import generate_pdf_report
                 p_ctx = st.session_state.get('product_context', {})
                 report_data = {
                     'creator_name': results.get('video_metadata', {}).get('channel', 'Unknown'),
