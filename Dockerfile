@@ -38,6 +38,9 @@ COPY requirements.txt .
 # Install CPU-Only Torch (Optimization: Reduces image size by 2GB+)
 RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
+# Install sentence-transformers (Using installed CPU torch)
+RUN pip install --no-cache-dir sentence-transformers
+
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
