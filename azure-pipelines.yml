@@ -52,7 +52,4 @@ stages:
                     azureSubscription: "azure-subscription"
                     appName: $(webAppName)
                     imageName: $(containerRegistry)/$(imageRepository):$(tag)
-                    appSettings: |
-                      -WEBSITES_PORT 8501
-                      -STREAMLIT_SERVER_PORT 8501
-                      -STREAMLIT_SERVER_HEADLESS true
+                    appSettings: "-WEBSITES_PORT 8501 -STREAMLIT_SERVER_PORT 8501 -STREAMLIT_SERVER_HEADLESS true"
