@@ -46,12 +46,12 @@ stages:
           runOnce:
             deploy:
               steps:
-                - task: AzureWebApp@1
+                - task: AzureWebAppContainer@1
                   displayName: "Azure Web App Container Deploy"
                   inputs:
-                    azureSubscription: "azure-subscription" # Create this in Azure DevOps
+                    azureSubscription: "azure-subscription"
                     appName: $(webAppName)
-                    containers: $(containerRegistry)/$(imageRepository):$(tag)
+                    imageName: $(containerRegistry)/$(imageRepository):$(tag)
                     appSettings: |
                       -WEBSITES_PORT 8501
                       -STREAMLIT_SERVER_PORT 8501
