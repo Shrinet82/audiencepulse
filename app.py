@@ -65,9 +65,26 @@ from supabase import create_client, Client
 @st.cache_resource
 def init_supabase():
     try:
-        url = st.secrets["supabase"]["url"]
-        key = st.secrets["supabase"]["key"]
-        return create_client(url, key)
+        # 1. Try Environment Variables (Azure/Prod)
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
+        
+        # 2. Try Streamlit Secrets (Local Dev)
+        if not url or not key:
+            try:
+                if "supabase" in st.secrets:
+                    url = st.secrets["supabase"]["url"]
+                    key = st.secrets["supabase"]["key"]
+            except FileNotFoundError:
+                pass # Secrets file not found, ignore
+            except Exception:
+                pass
+
+        if url and key:
+            return create_client(url, key)
+        else:
+            st.error("Supabase Credentials Missing (ENV or secrets.toml)")
+            return None
     except Exception as e:
         st.error(f"Supabase Init Failed: {e}")
         return None
