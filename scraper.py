@@ -1,81 +1,131 @@
 import argparse
 import json
-import itertools
-from youtube_comment_downloader import YoutubeCommentDownloader
-import pandas as pd
 import sys
-from tqdm import tqdm
-import signal
+import random
+import time
+import yt_dlp
+from datetime import datetime
+
+# Mock comments removed by user request.
+
+
 
 def get_comments(url, output_file, limit=None):
-    downloader = YoutubeCommentDownloader()
+    comments = []
+    metadata = {}
+
+    # METHOD 1: OFFICIAL API (Priority)
+    import streamlit as st
+    api_key = None
     try:
-        print(f"Fetching comments for {url}...")
-        # sort_by=1 for relevant, 0 for newest
-        comments = downloader.get_comments_from_url(url, sort_by=1) 
-        
-        # Generator for processing
-        iterator = comments
-        if limit:
-            iterator = itertools.islice(comments, limit)
+        api_key = st.secrets["youtube"]["api_key"]
+    except:
+        pass
 
-        count = 0
-        pbar = tqdm(desc="Fetching comments", unit=" comments")
-        
-        # Open file in append mode or streaming mode
-        f_json = None
-        f_csv = None
-        
-        if output_file:
-            if output_file.endswith('.json') or output_file.endswith('.jsonl'):
-                # Using JSON Lines format which is better for streaming
-                f_json = open(output_file, 'w', encoding='utf-8')
-            elif output_file.endswith('.csv'):
-                f_csv = open(output_file, 'w', encoding='utf-8')
-                # We need to know headers, so we might delay first write or just assume standard fields
-                # For simplicity, we'll write headers on first item
+    if api_key:
+        print("🔑 YouTube API Key found! Using Official Data API.")
+        try:
+            from googleapiclient.discovery import build
+            youtube = build('youtube', 'v3', developerKey=api_key)
+            
+            # Extract Video ID
+            if "v=" in url:
+                video_id = url.split('v=')[-1].split('&')[0]
+            elif "youtu.be/" in url:
+                video_id = url.split('youtu.be/')[-1].split('?')[0]
             else:
-                print(f"Unsupported streaming format for {output_file}. Only .json (jsonlines) and .csv supported for large scrapes.")
-                sys.exit(1)
+                video_id = url # Assumption or error checking could go here
+            
+            # Pagination Loop
+            next_page_token = None
+            max_limit = limit if limit else 2000 # User requested scale up to 2000
+            
+            while len(comments) < max_limit:
+                request = youtube.commentThreads().list(
+                    part="snippet",
+                    videoId=video_id,
+                    maxResults=100,
+                    order="relevance", # Fetches "Top comments" (most liked/replied) first
+                    textFormat="plainText",
+                    pageToken=next_page_token
+                )
+                response = request.execute()
+                
+                for item in response.get('items', []):
+                    snippet = item['snippet']['topLevelComment']['snippet']
+                    comments.append({
+                        'text': snippet['textDisplay'],
+                        'author': snippet['authorDisplayName'],
+                        'votes': snippet['likeCount'],
+                        'published_at': snippet['publishedAt']
+                    })
+                
+                next_page_token = response.get('nextPageToken')
+                if not next_page_token:
+                    break
+                    
+                print(f"   ...fetched {len(comments)} comments so far")
+            
+            success = True
+            print(f"✅ API Success! Got {len(comments)} comments.")
 
-        headers_written = False
+        except Exception as e:
+            print(f"⚠️ API Failed: {e}. Falling back to Scraper.")
+
+    # METHOD 2: SCRAPER (Fallback)
+    if not success:
+        ydl_opts = {
+            'skip_download': True,
+            'extract_flat': True,
+            'getcomments': True,
+            'quiet': True,
+            'no_warnings': True,
+            'extractor_args': {'youtube': {'player_client': ['web']}},
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        # CHECK FOR COOKIES
+        if os.path.exists('cookies.txt'):
+            print("🍪 Cookies found! Using 'cookies.txt' for authentication.")
+            ydl_opts['cookiefile'] = 'cookies.txt'
+        else:
+            print("⚠️ No cookies.txt found. Scraper might fail on Cloud IPs.")
 
         try:
-            for comment in iterator:
-                count += 1
-                pbar.update(1)
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                print(f"Fetching comments for {url} via Scraper...")
+                info = ydl.extract_info(url, download=False)
+                cwd_comments = info.get('comments')
                 
-                if f_json:
-                    f_json.write(json.dumps(comment, ensure_ascii=False) + '\n')
-                    f_json.flush() # Ensure data is written
-                elif f_csv:
-                    df = pd.DataFrame([comment])
-                    if not headers_written:
-                        df.to_csv(f_csv, index=False, encoding='utf-8', header=True)
-                        headers_written = True
-                    else:
-                        df.to_csv(f_csv, index=False, encoding='utf-8', header=False)
-                    f_csv.flush()
+                if cwd_comments:
+                    comments = cwd_comments
+                    success = True
+                    print(f"✅ Scraper Success! Got {len(comments)} comments.")
                 else:
-                    # Print to console if no file, but only first 10 to avoid spam
-                    if count <= 10:
-                        print(comment.get('text', ''))
+                    print("❌ Scraper returned 0 comments. Possibly blocked.")
+                    
+        except Exception as e:
+            print(f"❌ Scraper Failed: {e}")
+    
+    # OUTPUT
+    count = 0
+    if output_file and comments:
+        mode = 'w'
+        with open(output_file, mode, encoding='utf-8') as f:
+            for comment in comments:
+                # Normalize typical fields
+                c_obj = {
+                    'text': comment.get('text') or comment.get('content'),
+                    'author': comment.get('author') or comment.get('uploader'),
+                    'votes': comment.get('like_count', 0),
+                    'published_at': comment.get('timestamp')
+                }
+                f.write(json.dumps(c_obj, ensure_ascii=False) + '\n')
+                count += 1
+                if limit and count >= limit:
+                    break
+        print(f"Saved {count} comments to {output_file}")
 
-        except KeyboardInterrupt:
-            print("\nScraping interrupted by user. Saving progress...")
-
-        finally:
-            pbar.close()
-            if f_json:
-                f_json.close()
-                print(f"\nSaved {count} comments to {output_file} (JSON Lines format).")
-            if f_csv:
-                f_csv.close()
-                print(f"\nSaved {count} comments to {output_file}.")
-
-    except Exception as e:
-        print(f"\nError: {e}")
-        sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape YouTube comments from a video URL.")
@@ -84,7 +134,6 @@ def main():
     parser.add_argument("-l", "--limit", type=int, help="Limit number of comments to download")
     
     args = parser.parse_args()
-    
     get_comments(args.url, args.output, args.limit)
 
 if __name__ == "__main__":

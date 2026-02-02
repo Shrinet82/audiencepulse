@@ -123,10 +123,18 @@ def get_transcript(url: str, languages: list = None) -> Dict:
     if not video_id:
         return {"error": "Invalid URL", "segments": []}
     
+    # COOKIE SUPPORT
+    cookies = None
+    if os.path.exists('cookies.txt'):
+        cookies = 'cookies.txt'
+    
     try:
         # Create API instance and fetch transcript
-        api = YouTubeTranscriptApi()
-        transcript = api.fetch(video_id, languages=languages)
+        # Note: API accepts cookies file path string directly in newer versions or via other methods.
+        # Ideally: api = YouTubeTranscriptApi() 
+        # But transcript fetching is static method.
+        # Actually proper way:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages, cookies=cookies)
         
         # Convert to list of dicts
         segments = []

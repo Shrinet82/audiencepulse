@@ -50,4 +50,18 @@ creator_audit_report.json
 *.pdf
 
 # Antigravity
-.gemini/
+
+# Security
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+
+# Dependencies
+node_modules/
+
+# Logs
+streamlit.log
+
+# Data
+godmode_report.json
+test_output.jsonl
+comparison_*.json

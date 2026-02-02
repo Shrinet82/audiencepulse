@@ -1,0 +1,1 @@
+Campaign Table Exists! Count: 0

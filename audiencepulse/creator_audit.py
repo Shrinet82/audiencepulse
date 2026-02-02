@@ -76,7 +76,7 @@ def calculate_creator_fit(
     # 2. BRAND COMPATIBILITY (30%)
     target_brand = product_context.get('name', '').lower()
     brand_orbit = brand_affinity.get('brand_orbit', [])
-    brand_mentions = [b for b in brand_orbit if b['name'].lower() in target_brand or target_brand in b['name'].lower()]
+    brand_mentions = [b for b in brand_orbit if b.get('brand', '').lower() in target_brand or target_brand in b.get('brand', '').lower()]
     
     if brand_mentions:
         # Brand exists in orbit! Use the sentiment.
