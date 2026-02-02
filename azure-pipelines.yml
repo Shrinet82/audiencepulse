@@ -5,14 +5,14 @@ pool:
 
 variables:
   # Container Registry Config
-  dockerRegistryServiceConnection: "acr-connection" # Replace with your Service Connection Name
+  dockerRegistryServiceConnection: "acr-connection" # Create this in Azure DevOps Project Settings > Service Connections
   imageRepository: "audiencepulse"
-  containerRegistry: "youracr.azurecr.io" # Replace with your ACR Login Server
+  containerRegistry: "audiencepulseacrcentral.azurecr.io"
   dockerfilePath: "$(Build.SourcesDirectory)/Dockerfile"
   tag: "$(Build.BuildId)"
 
   # Web App Config
-  webAppName: "audiencepulse-app" # Replace with your App Service Name
+  webAppName: "audiencepulse-app-0202"
 
 stages:
   - stage: Build
@@ -49,7 +49,7 @@ stages:
                 - task: AzureWebApp@1
                   displayName: "Azure Web App Container Deploy"
                   inputs:
-                    azureSubscription: "azure-subscription" # Replace with your Subscription Connection
+                    azureSubscription: "azure-subscription" # Create this in Azure DevOps
                     appName: $(webAppName)
                     containers: $(containerRegistry)/$(imageRepository):$(tag)
                     appSettings: |

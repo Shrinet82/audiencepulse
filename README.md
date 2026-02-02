@@ -111,6 +111,15 @@ You **MUST** set these secrets in your Azure Web App > Configuration:
 
 ---
 
+### 3. Provisioned Resources (Central US)
+
+- **Resource Group**: `AudiencePulse_RG_Central`
+- **ACR**: `audiencepulseacrcentral.azurecr.io`
+- **App Plan**: `AudiencePulse_Plan` (Linux B1)
+- **Web App**: `audiencepulse-app-0202`
+
+---
+
 ## 📸 Screenshots
 
 |                            Dashboard                             |                      Intelligence Profile                      |
