@@ -1,7 +1,7 @@
 trigger: none
 
 pool:
-  vmImage: "ubuntu-latest"
+  name: "VMSS-Pool"
 
 variables:
   # Container Registry Config
@@ -41,7 +41,7 @@ stages:
         displayName: Deploy
         environment: "production"
         pool:
-          vmImage: "ubuntu-latest"
+          name: "VMSS-Pool"
         strategy:
           runOnce:
             deploy:
