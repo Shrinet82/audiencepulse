@@ -290,8 +290,9 @@ else:
     st.sidebar.subheader("🕒 Recent Audits")
 
 try:
-    if supabase:
+    if supabase and st.session_state.user:
         # Fetch history filtered by campaign if selected
+        user_email = st.session_state.user.email
         query = supabase.table('audit_logs').select("id, creator_name, final_score, created_at").eq('user_email', user_email)
         
         if selected_camp_id:
