@@ -35,7 +35,10 @@ RUN groupadd -g 1000 appgroup && \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install CPU-Only Torch (Optimization: Reduces image size by 2GB+)
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
