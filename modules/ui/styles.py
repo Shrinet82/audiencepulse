@@ -2,138 +2,131 @@ def get_custom_css():
     return """
     <style>
         /* =========================================
-           GLASSMORPHISM THEME - AUDIENCEPULSE 2.0
+           AUDIENCEPULSE PREMIUM UI THEME
            ========================================= */
         
-        /* 1. BACKGROUND & TYPOGRAPHY */
+        /* 1. GLOBAL RESET & TYPOGRAPHY */
         .stApp {
-            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            background: linear-gradient(135deg, #0b0f1a 0%, #141a2f 100%);
             background-attachment: fixed;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             color: #e0e0e0;
         }
         
-        h1, h2, h3, h4 {
+        h1, h2, h3, h4, h5, h6 {
             color: #ffffff !important;
             font-weight: 700;
             letter-spacing: -0.5px;
         }
         
-        .stMarkdown p {
+        p, .stMarkdown, .stText {
             color: #cbd5e1 !important;
-            line-height: 1.6;
+        }
+
+        /* 2. SIDEBAR - DARK GLASS */
+        section[data-testid="stSidebar"] {
+            background-color: rgba(11, 15, 26, 0.95);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
         }
         
-        /* 2. GLASS CARDS */
+        /* Sidebar Text */
+        section[data-testid="stSidebar"] .stMarkdown h1, h2, h3 {
+             color: #94a3b8 !important;
+        }
+
+        /* 3. INPUTS - GLASS STYLE */
+        .stTextInput input, 
+        .stSelectbox div[data-baseweb="select"] > div, 
+        .stTextArea textarea {
+            background-color: rgba(255, 255, 255, 0.04) !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 8px !important;
+        }
+        
+        .stTextInput input:focus, 
+        .stTextArea textarea:focus {
+            border-color: #00d4ff !important;
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 0 0 1px #00d4ff !important;
+        }
+
+        /* 4. BUTTONS - PREMIUM GRADIENT */
+        div.stButton > button {
+            background: linear-gradient(135deg, #00d4ff 0%, #3b82f6 100%);
+            color: white !important;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+        
+        div.stButton > button:active {
+            transform: translateY(0px);
+        }
+        
+        /* Secondary Buttons (Ghost) */
+        div[data-testid="stForm"] div.stButton > button[kind="secondary"] {
+             background: transparent;
+             border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* 5. GLASS CARDS & CONTAINERS */
         .glass-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
             padding: 24px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 24px;
-            transition: transform 0.2s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: border-color 0.3s ease;
         }
         
         .glass-card:hover {
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
+            border-color: rgba(0, 212, 255, 0.3);
         }
 
-        /* 3. HERO METRICS (Score Cards) */
-        .metric-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-        
+        /* 6. HERO METRICS */
         .big-score {
-            font-size: 4.5rem;
+            font-size: 3.5rem;
             font-weight: 800;
-            background: -webkit-linear-gradient(45deg, #00d4ff, #8b5cf6);
+            background: linear-gradient(to right, #00d4ff, #8b5cf6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
-            margin: 0;
-            line-height: 1;
-        }
-        
-        .score-label {
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-size: 0.8rem;
-            color: #94a3b8;
-            margin-top: 12px;
-        }
-        
-        /* 4. TABS & NAVIGATION */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 24px;
-            background-color: transparent;
+            margin-bottom: 0.5rem;
         }
 
-        .stTabs [data-baseweb="tab"] {
-            height: 50px;
-            white-space: pre-wrap;
-            background-color: transparent;
-            border-radius: 8px;
-            color: #94a3b8;
-            font-weight: 600;
-            border: none;
-            padding: 0 16px; 
-            transition: all 0.2s;
-        }
-
-        .stTabs [data-baseweb="tab"]:hover {
-            color: #ffffff;
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .stTabs [aria-selected="true"] {
-            color: #00d4ff !important;
-            background: rgba(0, 212, 255, 0.1) !important;
-            border-bottom: 2px solid #00d4ff;
-        }
-
-        /* 5. COMPONENTS */
-        /* Status Badges */
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .badge-premium { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.4); }
-        .badge-success { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
-        .badge-danger  { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
-        .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.4); }
-
-        /* Hide Streamlit default elements */
+        /* 7. HIDE STREAMLIT CHROME */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
         
-        /* Input Fields */
-        .stTextInput > div > div > input {
-            background-color: rgba(255, 255, 255, 0.05);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+        /* 8. TABS */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px;
+            background-color: transparent;
         }
         
-        .stTextArea > div > div > textarea {
-            background-color: rgba(255, 255, 255, 0.05);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+        .stTabs [data-baseweb="tab"] {
+            height: 44px;
+            border-radius: 6px;
+            color: #64748b;
+            font-weight: 600;
+            background-color: transparent;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            color: #38bdf8 !important;
+            background: rgba(56, 189, 248, 0.1) !important;
         }
     </style>
     """

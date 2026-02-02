@@ -1,0 +1,58 @@
+trigger: none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  # Container Registry Config
+  dockerRegistryServiceConnection: "acr-connection" # Replace with your Service Connection Name
+  imageRepository: "audiencepulse"
+  containerRegistry: "youracr.azurecr.io" # Replace with your ACR Login Server
+  dockerfilePath: "$(Build.SourcesDirectory)/Dockerfile"
+  tag: "$(Build.BuildId)"
+
+  # Web App Config
+  webAppName: "audiencepulse-app" # Replace with your App Service Name
+
+stages:
+  - stage: Build
+    displayName: Build and push stage
+    jobs:
+      - job: Build
+        displayName: Build
+        steps:
+          - task: Docker@2
+            displayName: Build and push an image to container registry
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: $(dockerRegistryServiceConnection)
+              tags: |
+                $(tag)
+                latest
+
+  - stage: Deploy
+    displayName: Deploy stage
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: Deploy
+        displayName: Deploy
+        environment: "production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: "Azure Web App Container Deploy"
+                  inputs:
+                    azureSubscription: "azure-subscription" # Replace with your Subscription Connection
+                    appName: $(webAppName)
+                    containers: $(containerRegistry)/$(imageRepository):$(tag)
+                    appSettings: |
+                      -WEBSITES_PORT 8501
+                      -STREAMLIT_SERVER_PORT 8501
+                      -STREAMLIT_SERVER_HEADLESS true

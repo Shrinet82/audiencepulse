@@ -87,6 +87,30 @@ Login with default credentials (if seeded) or sign up via the UI.
 
 ---
 
+## ☁️ Deployment (Azure)
+
+### 1. Azure Pipeline
+
+The project includes `azure-pipelines.yml` for CI/CD.
+
+- **Trigger**: Manual (configured via `trigger: none`).
+- **Build**: Docker Image → ACR.
+- **Deploy**: Web App for Containers.
+
+### 2. Configuration (App Settings)
+
+You **MUST** set these secrets in your Azure Web App > Configuration:
+
+| Setting                          | Value                     |
+| :------------------------------- | :------------------------ |
+| `SUPABASE_URL`                   | Your Supabase Project URL |
+| `SUPABASE_KEY`                   | Your Supabase Anon Key    |
+| `GROQ_API_KEY`                   | Your Groq AI Key          |
+| `YOUTUBE_API_KEY`                | Google Data API Key       |
+| `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true`                    |
+
+---
+
 ## 📸 Screenshots
 
 |                            Dashboard                             |                      Intelligence Profile                      |

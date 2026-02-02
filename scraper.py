@@ -4,6 +4,7 @@ import sys
 import random
 import time
 import yt_dlp
+import os
 from datetime import datetime
 
 # Mock comments removed by user request.
@@ -18,9 +19,14 @@ def get_comments(url, output_file, limit=None):
     import streamlit as st
     api_key = None
     try:
-        api_key = st.secrets["youtube"]["api_key"]
+        if "youtube" in st.secrets:
+            api_key = st.secrets["youtube"]["api_key"]
     except:
         pass
+    
+    # Fallback to Env Var
+    if not api_key:
+        api_key = os.environ.get("YOUTUBE_API_KEY")
 
     if api_key:
         print("🔑 YouTube API Key found! Using Official Data API.")
