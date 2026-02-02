@@ -9,16 +9,22 @@ class AppConfig:
     def get_supabase_client() -> Client:
         # Load secrets from Streamlit secrets or Env vars
         try:
-            # Try loading from streamlit secrets (lowercase nested)
-            if "supabase" in st.secrets:
-                url = st.secrets["supabase"]["url"]
-                key = st.secrets["supabase"]["key"]
-                return create_client(url, key)
+            # 1. Try Environment Variables (Azure/Prod)
+            url = os.environ.get("SUPABASE_URL")
+            key = os.environ.get("SUPABASE_KEY")
             
-            # Fallback to env vars or uppercase keys (legacy)
-            url = os.environ.get("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
-            key = os.environ.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_KEY")
-            
+            # 2. Try Streamlit Secrets (Local Dev) - Only if Env Vars missing
+            if not url or not key:
+                try:
+                    # Safe access to st.secrets
+                    if "supabase" in st.secrets:
+                        url = st.secrets["supabase"]["url"]
+                        key = st.secrets["supabase"]["key"]
+                except FileNotFoundError:
+                    pass # Secrets file not found (normal in Prod)
+                except Exception:
+                    pass # Handle other secrets access errors gracefully
+
             if url and key:
                 return create_client(url, key)
                 
