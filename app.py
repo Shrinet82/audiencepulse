@@ -863,9 +863,11 @@ if st.session_state.audit_results:
         q = st.chat_input("Ask about this creator's audience...")
         if q:
             st.session_state.chat_history.append({"role": "user", "content": q})
-            # (Simplified: Reuse existing context logic or calling directly here would duplicate code. 
-            # ideally we refactor the chat logic to a function, but for now we keep it simple or user must re-implement)
-            st.info("AI Chat active (Backend connected)") 
+            
+            # TODO: Integrate actual LLM response here using run_creator_audit logic if needed
+            # For now, just echo or show it's received
+            
+            st.rerun() 
 
     # ----------------------------------------
     # 4. EXPORT
