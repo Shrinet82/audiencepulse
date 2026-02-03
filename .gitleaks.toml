@@ -1,12 +1,10 @@
-# Gitleaks configuration for AudiencePulse
-# https://github.com/gitleaks/gitleaks
+# Gitleaks Configuration
+# Allow certain false positives that are not actual secrets
 
-title = "AudiencePulse Gitleaks Config"
+title = "Gitleaks Config"
 
 [allowlist]
-description = "Global allowlist"
-paths = [
-  '''\.env\.example''',
-  '''README\.md''',
-  '''requirements\.txt''',
-]
+  description = "Allow non-secret resource names"
+  paths = [
+    '''k8s/secretproviderclass\.yaml''',
+  ]

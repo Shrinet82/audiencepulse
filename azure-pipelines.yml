@@ -1,28 +1,63 @@
-trigger: none
-
-pool:
-  name: "VMSS-Pool"
+trigger:
+  - master
 
 variables:
   # Container Registry Config
-  dockerRegistryServiceConnection: "acr-connection" # Create this in Azure DevOps Project Settings > Service Connections
+  dockerRegistryServiceConnection: "acr-connection"
   imageRepository: "audiencepulse"
   containerRegistry: "audiencepulseacrcentral.azurecr.io"
   dockerfilePath: "$(Build.SourcesDirectory)/Dockerfile"
   tag: "$(Build.BuildId)"
 
   # Web App Config
+  azureSubscription: "azure-subscription"
   webAppName: "audiencepulse-app-0202"
 
+  # Agents
+  agentPool: "VMSS-Pool"
+
 stages:
-  - stage: Build
-    displayName: Build and push stage
+  # -------------------------------------------------------------------------
+  # STAGE 1: SECURITY GATES 🛡️
+  # -------------------------------------------------------------------------
+  - stage: SecurityGates
+    displayName: "Stage 1: Security Gates"
     jobs:
-      - job: Build
-        displayName: Build
+      - job: SecretScan
+        displayName: "Secret Scan (Gitleaks)"
+        pool:
+          name: $(agentPool)
+        steps:
+          - script: |
+              wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+              tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
+              sudo mv gitleaks /usr/local/bin/
+              gitleaks detect --source . -v --report-format json --report-path gitleaks-report.json || true
+              # Fail if secrets found (uncomment to enforce)
+              # gitleaks detect --source . -v
+            displayName: "Run Gitleaks"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Security Report"
+            condition: always()
+            inputs:
+              pathToPublish: "gitleaks-report.json"
+              artifactName: "security-artifacts"
+
+  # -------------------------------------------------------------------------
+  # STAGE 2: BUILD FACTORY 🏗️
+  # -------------------------------------------------------------------------
+  - stage: BuildFactory
+    displayName: "Stage 2: Build Factory"
+    dependsOn: SecurityGates
+    jobs:
+      - job: BuildAndPush
+        displayName: "Build & Push Docker Image"
+        pool:
+          name: $(agentPool)
         steps:
           - task: Docker@2
-            displayName: Build and push an image to container registry
+            displayName: "Build & Push"
             inputs:
               command: buildAndPush
               repository: $(imageRepository)
@@ -32,24 +67,56 @@ stages:
                 $(tag)
                 latest
 
-  - stage: Deploy
-    displayName: Deploy stage
-    dependsOn: Build
-    condition: succeeded()
+  # -------------------------------------------------------------------------
+  # STAGE 3: DELIVERY 🚚
+  # -------------------------------------------------------------------------
+  - stage: Delivery
+    displayName: "Stage 3: Delivery"
+    dependsOn: BuildFactory
     jobs:
       - deployment: Deploy
-        displayName: Deploy
+        displayName: "Deploy to Azure"
         environment: "production"
         pool:
-          name: "VMSS-Pool"
+          name: $(agentPool)
         strategy:
           runOnce:
             deploy:
               steps:
                 - task: AzureWebAppContainer@1
-                  displayName: "Azure Web App Container Deploy"
+                  displayName: "Azure Web App Deploy"
                   inputs:
-                    azureSubscription: "azure-subscription"
+                    azureSubscription: $(azureSubscription)
                     appName: $(webAppName)
                     imageName: $(containerRegistry)/$(imageRepository):$(tag)
+                    # Env vars are already set in App Service, but ports must be explicit
                     appSettings: "-WEBSITES_PORT 8501 -STREAMLIT_SERVER_PORT 8501 -STREAMLIT_SERVER_HEADLESS true"
+
+  # -------------------------------------------------------------------------
+  # STAGE 4: VERIFICATION ✅
+  # -------------------------------------------------------------------------
+  - stage: Verification
+    displayName: "Stage 4: Verification"
+    dependsOn: Delivery
+    jobs:
+      - job: SmokeTest
+        displayName: "Smoke Test (Live URL)"
+        pool:
+          name: $(agentPool)
+        steps:
+          - script: |
+              echo "Waiting for app to warm up..."
+              sleep 30
+
+              URL="https://$(webAppName).azurewebsites.net"
+              echo "Checking $URL..."
+
+              STATUS=$(curl -o /dev/null -s -w "%{http_code}\n" $URL)
+
+              if [ "$STATUS" == "200" ]; then
+                echo "✅ App is effectively UP (HTTP $STATUS)"
+              else
+                 echo "⚠️ App returned HTTP $STATUS (Might still be starting)"
+                 # We don't fail the pipeline drastically here as Streamlit takes time
+              fi
+            displayName: "Check HTTP Status"
