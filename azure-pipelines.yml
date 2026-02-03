@@ -19,7 +19,6 @@ variables:
 stages:
   # -------------------------------------------------------------------------
   # STAGE 1: QUALITY ASSURANCE (QA) 🧪
-  # Runs: Linting & Unit Tests
   # -------------------------------------------------------------------------
   - stage: QA
     displayName: "Stage 1: Quality Assurance"
@@ -33,11 +32,9 @@ stages:
               black --check . || echo "⚠️ Formatting issues found (fix with 'black .')"
 
               echo "Running Linter..."
-              # Ignore common errors for now to not block build completely
               flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
               echo "Running Unit Tests..."
-              # Create a dummy test if none exists to ensure pytest runs
               if [ ! -d "tests" ]; then mkdir tests; fi
               pytest --junitxml=test-results.xml || true
             displayName: "Run Quality Checks"
@@ -51,16 +48,15 @@ stages:
 
   # -------------------------------------------------------------------------
   # STAGE 2: SECURITY GATES 🛡️
-  # Runs: Secret Scanning & Infrastructure Scanning (IaC)
   # -------------------------------------------------------------------------
   - stage: Security
     displayName: "Stage 2: Security Gates"
-    dependsOn: [] # Run in parallel with QA
+    dependsOn: QA # Sequential: Waits for QA
     jobs:
       - job: SecurityScans
         displayName: "Security Scans"
         steps:
-          # 1. Gitleaks (Secrets)
+          # 1. Gitleaks
           - script: |
               wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
               tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
@@ -69,7 +65,7 @@ stages:
               gitleaks detect --source . -v --report-format json --report-path gitleaks-report.json || true
             displayName: "Run Gitleaks"
 
-          # 2. Checkov (IaC)
+          # 2. Checkov
           - script: |
               pip install checkov
               echo "Running Checkov on K8s manifests..."
@@ -91,11 +87,10 @@ stages:
 
   # -------------------------------------------------------------------------
   # STAGE 3: SECURE BUILD FACTORY 🏗️
-  # Runs: Docker Build & Vulnerability Scan (Trivy)
   # -------------------------------------------------------------------------
   - stage: Build
     displayName: "Stage 3: Secure Build"
-    dependsOn: [] # Run in parallel with QA & Security (Speed!)
+    dependsOn: Security # Sequential: Waits for Security
     jobs:
       - job: BuildAndScan
         displayName: "Build, Push & Scan"
@@ -112,7 +107,7 @@ stages:
                 $(tag)
                 latest
 
-          # 2. Trivy Scan (Image Vulnerabilities)
+          # 2. Trivy Scan
           - script: |
               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
               echo "Scanning Image..."
@@ -127,11 +122,10 @@ stages:
 
   # -------------------------------------------------------------------------
   # STAGE 4: DELIVERY 🚚
-  # Runs: Deployment to Azure Web App
   # -------------------------------------------------------------------------
   - stage: Delivery
     displayName: "Stage 4: Delivery"
-    dependsOn: [QA, Security, Build] # Wait for all checks to pass
+    dependsOn: Build # Sequential: Waits for Build
     condition: succeeded()
     jobs:
       - deployment: WebApp
@@ -151,11 +145,10 @@ stages:
 
   # -------------------------------------------------------------------------
   # STAGE 5: VERIFICATION ✅
-  # Runs: Smoke Test
   # -------------------------------------------------------------------------
   - stage: Verification
     displayName: "Stage 5: Verification"
-    dependsOn: Delivery
+    dependsOn: Delivery # Sequential: Waits for Delivery
     jobs:
       - job: SmokeTest
         displayName: "Live Health Check"
@@ -168,7 +161,6 @@ stages:
                 echo "✅ Success: HTTP $STATUS"
               else
                 echo "⚠️ Warning: HTTP $STATUS"
-                # Fail verification if site is down
                 exit 1
               fi
             displayName: "HTTP 200 Check"
