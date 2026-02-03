@@ -862,11 +862,29 @@ if st.session_state.audit_results:
                 
         q = st.chat_input("Ask about this creator's audience...")
         if q:
+            # 1. Append User Message
             st.session_state.chat_history.append({"role": "user", "content": q})
             
-            # TODO: Integrate actual LLM response here using run_creator_audit logic if needed
-            # For now, just echo or show it's received
+            # 2. Get AI Response
+            with st.spinner("Analyzing..."):
+                try:
+                    from audiencepulse.chat import get_chat_response
+                    
+                    # Prepare Context
+                    context = st.session_state.get('audit_results', {})
+                    
+                    # Get Reply
+                    reply = get_chat_response(st.session_state.chat_history, analysis_context=context)
+                    
+                    # 3. Append AI Message
+                    st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                    
+                except ImportError:
+                    st.error("Chat module not found. Please redeploy.")
+                except Exception as e:
+                    st.error(f"Chat Error: {e}")
             
+            # 4. Refresh UI
             st.rerun() 
 
     # ----------------------------------------
